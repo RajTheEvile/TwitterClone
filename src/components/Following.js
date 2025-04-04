@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
+import Cookies from "js-cookie";
+import { Link } from "react-router-dom";
 
 const Following = () => {
   const [following, setFollowing] = useState([]);
-  const token = localStorage.getItem("jwtToken");
+  const token = Cookies.get("token");
 
   useEffect(() => {
     const fetchFollowing = async () => {
@@ -21,15 +23,17 @@ const Following = () => {
   }, [token]);
 
   return (
-    <div className="container mt-4">
-      <h2>Following</h2>
+    <div className="card p-3 mt-3 shadow-sm">
+      <h2 className="text-warning">Following</h2>
       {following.length === 0 ? (
-        <p>You are not following anyone yet.</p>
+        <p className="text-muted">You are not following anyone yet.</p>
       ) : (
         <ul className="list-group">
           {following.map((user, index) => (
             <li key={index} className="list-group-item">
-              {user.name}
+              <Link to={`/profile/${user.username}`} className="text-decoration-none text-dark">
+                  <strong>{user.name}</strong> @{user.username}
+                </Link>
             </li>
           ))}
         </ul>

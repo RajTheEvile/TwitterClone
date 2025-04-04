@@ -33,17 +33,15 @@ initializeDBAndServer();
 
 // Middleware for Authentication
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers["authorization"] || req.headers["Authorization"];
-  console.log("Auth Header:", authHeader);
+  const authHeader = req.headers["authorization"];
 
   if (!authHeader) return res.status(401).send("Invalid JWT Token");
-
   const token = authHeader.split(" ")[1]; // Ensure "Bearer <token>" format
   if (!token) return res.status(401).send("Token missing");
 
   jwt.verify(token, "SECRET_KEY", (err, user) => {
     if (err) return res.status(403).send("Invalid JWT  Token");
-    req.user = user;
+    req.user = user;  
     next();
   });
 };
@@ -72,13 +70,14 @@ app.post("/login/", async (req, res) => {
   const user = await db.get("SELECT * FROM user WHERE username = ?", [
     username,
   ]);
+  console.log(user);
   if (!user) return res.status(400).send("Invalid user");
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
   if (!isPasswordValid) return res.status(400).send("Invalid password");
 
   const token = jwt.sign({ user_id: user.user_id }, "SECRET_KEY");
-  res.json({ jwtToken: token });
+  res.json({ jwtToken: token,name:user.name,username:user.username,gender:user.gender,userId:user.user_id });
 });
 
 // API 3: User's Tweet Feed
@@ -86,7 +85,7 @@ app.get("/user/tweets/feed/", authenticateToken, async (req, res) => {
   const { user_id } = req.user;
   const tweets = await db.all(
     `
-    SELECT user.username, tweet.tweet, tweet.date_time as dateTime 
+    SELECT user.username, tweet.tweet, tweet.date_time as dateTime ,tweet.tweet_id as tweetId
     FROM tweet 
     JOIN follower ON tweet.user_id = follower.following_user_id
     JOIN user ON tweet.user_id = user.user_id
@@ -101,25 +100,37 @@ app.get("/user/tweets/feed/", authenticateToken, async (req, res) => {
 
 // API 4: Get Following List
 app.get("/user/following/", authenticateToken, async (req, res) => {
-  const { user_id } = req.user;
-  const followingList = await db.all(
-    `
-    SELECT user.name 
-    FROM user 
-    JOIN follower ON user.user_id = follower.following_user_id
-    WHERE follower.follower_user_id = ?
-  `,
-    [user_id]
-  );
-  res.json(followingList);
+  try {
+    const { user_id } = req.user;
+    
+    if (!user_id) {
+      return res.status(401).json({ error: "Unauthorized: User ID missing" });
+    }
+
+    const followingList = await db.all(
+      `
+      SELECT user.user_id, user.name ,user.username
+      FROM user 
+      JOIN follower ON user.user_id = follower.following_user_id
+      WHERE follower.follower_user_id = ?
+      `,
+      [user_id]
+    );
+
+    res.json(followingList);
+  } catch (error) {
+    console.error("Database error:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 });
+
 
 // API 5: Get Followers List
 app.get("/user/followers/", authenticateToken, async (req, res) => {
   const { user_id } = req.user;
   const followersList = await db.all(
     `
-    SELECT user.name 
+    SELECT user.name ,user.username
     FROM user 
     JOIN follower ON user.user_id = follower.follower_user_id
     WHERE follower.following_user_id = ?
@@ -226,7 +237,6 @@ app.delete(
     // Check if the tweet exists
     const tweetQuery = `SELECT * FROM tweet WHERE tweet_id = ?`;
     const tweet = await db.get(tweetQuery, [tweetId]);
-    console.log(tweet);
     if (!tweet) {
       return response.status(400).send("Invalid Request");
     }
@@ -243,5 +253,159 @@ app.delete(
     response.send("Tweet Removed");
   }
 );
+
+//search for a user
+app.get("/user/search", authenticateToken, async (req, res) => {
+  const { username } = req.query; // Use query parameter instead of params
+
+  try {
+    const tweets = await db.all(
+      `
+      SELECT username FROM user 
+      WHERE username LIKE ?
+      `,
+      [`${username}%`] // Ensure the query is properly formatted
+    );
+
+    res.json(tweets);
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// get profile details
+app.get("/profile/:username", authenticateToken, async (req, res) => {
+  const { username } = req.params;
+  const loggedInUser = req.user.user_id;
+
+  try {
+    // Get the user profile details
+    const userWithoutFollowStatus = await db.get(
+      `SELECT user_id, name, username, gender FROM user WHERE username = ?`,
+      [username] // Parameterized query to prevent SQL injection
+    );
+
+    // If user doesn't exist, return a 404 error
+    if (!userWithoutFollowStatus) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Check if the logged-in user is following the profile user
+    const followingStatus = await db.get(
+      `SELECT 1 FROM follower WHERE follower_user_id = ? AND following_user_id = ?`,
+      [loggedInUser, userWithoutFollowStatus.user_id]
+    );
+
+    // Fetch user's tweets (Ensure multiple tweets can be fetched)
+    const tweets = await db.all(`SELECT * FROM Tweet WHERE user_id = ?`, [userWithoutFollowStatus.user_id]);
+
+    // Construct the final response
+    const user = {
+      ...userWithoutFollowStatus,
+      followingStatus: !!followingStatus, // Convert to boolean
+      tweets, // Include fetched tweets
+    };
+    console.log(user);
+    res.json(user);
+  } catch (error) {
+    console.error("Error fetching user:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+//follow a user
+app.post("/follow/:username", authenticateToken, async (req, res) => {
+  const { username } = req.params; // Target user to follow
+  const loggedInUser = req.user.user_id; // Extracted from JWT (logged-in user's ID)
+  
+  try {
+    // Get the user ID of the target username
+    const followId = await db.get("SELECT user_id FROM user WHERE username = ?", [username]);
+    
+    // Check if the target user exists
+    if (!followId) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    const FId = followId.user_id;
+    //console.log("Logged in user ID:", loggedInUser, "Target user ID:", FId);
+    
+    // Ensure the user cannot follow themselves
+    if (loggedInUser === FId) {
+      return res.status(400).json({ message: "You cannot follow yourself" });
+    }
+
+    // Check if already following the target user
+    const checkFollow = await db.get(
+      "SELECT * FROM follower WHERE follower_user_id = ? AND following_user_id = ?",
+      [loggedInUser, FId]
+    );
+
+    if (checkFollow) {
+      return res.status(400).json({ message: "Already following this user" });
+    }
+
+    // Insert follow relationship into the Follower Table
+    await db.run(
+      "INSERT INTO follower (follower_user_id, following_user_id) VALUES (?, ?)",
+      [loggedInUser, FId]
+    );
+
+    res.json({ message: `You are now following ${username}` });
+  } catch (error) {
+    //console.error("Follow Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+//unfollow a user
+app.post("/unfollow/:username", authenticateToken, async (req, res) => {
+  const { username } = req.params; // Target user to follow
+  const loggedInUser = req.user.user_id; // Extracted from JWT (logged-in user's ID)
+  
+  try {
+    // Get the user ID of the target username
+    const followId = await db.get("SELECT user_id FROM user WHERE username = ?", [username]);
+    
+    // Check if the target user exists
+    if (!followId) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    const FId = followId.user_id;
+    //console.log("Logged in user ID:", loggedInUser, "Target user ID:", FId);
+    
+    // Ensure the user cannot follow themselves
+    if (loggedInUser === FId) {
+      return res.status(400).json({ message: "You cannot follow yourself" });
+    }
+
+    // Check if already following the target user
+    const checkFollow = await db.get(
+      "SELECT * FROM follower WHERE follower_user_id = ? AND following_user_id = ?",
+      [loggedInUser, FId]
+    );
+
+    if ( !checkFollow) {
+      return res.status(400).json({ message: "Already Unfollowing this user" });
+    }
+
+    // Insert follow relationship into the Follower Table
+    await db.run(
+      "DELETE from  follower where follower_user_id= ? and following_user_id=? ;",
+      [loggedInUser, FId]
+    );
+
+    res.json({ message: `You are now unfollowing ${username}` });
+  } catch (error) {
+    //console.error("Follow Error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
+
 
 module.exports = app;

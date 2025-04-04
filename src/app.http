@@ -86,3 +86,14 @@ Content-Type: application/json
 DELETE http://localhost:5000/tweets/1/
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjo3LCJpYXQiOjE3NDI0NjUyNDl9.H1BI84ExoDsWUGchjX1rTXA1_bkX_dI21bUHIK3D1Tc
 Content-Type: application/json
+
+####
+GET   http://localhost:5000/user/search?username=E
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjo3LCJpYXQiOjE3NDMxMzk3OTl9.nE100xK7Ueao3b2IW0lB7VY6FHm1R-QRqQVYsFfLMsU
+Content-Type: application/json
+
+
+###
+GET   http://localhost:5000/profile/Evileye/
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjo3LCJpYXQiOjE3NDMxMzk3OTl9.nE100xK7Ueao3b2IW0lB7VY6FHm1R-QRqQVYsFfLMsU
+Content-Type: application/json
