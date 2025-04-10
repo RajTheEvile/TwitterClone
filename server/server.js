@@ -1,35 +1,41 @@
 const express = require("express");
 const sqlite3 = require("sqlite3");
 const { open } = require("sqlite");
-const bcrypt = require("bcryptjs");
+const bcrypt = require("bcryptjs"); // Safer for deployment
 const jwt = require("jsonwebtoken");
+const cors = require("cors");
+
 const app = express();
 app.use(express.json());
 
-
-const cors = require("cors");
+// Adjust CORS: allow both local and production frontend URLs
 app.use(cors({
-  origin: "http://localhost:3000",
+  origin: ["http://localhost:3000", "https://rajtheevile.github.io"],
   methods: ["GET", "POST", "DELETE", "PUT"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
-
+// Database path
 const dbPath = "./twitterClone.db";
 let db = null;
+
+// Use dynamic PORT for deployment, fallback to 5000 for local dev
+const PORT = process.env.PORT || 5000;
 
 const initializeDBAndServer = async () => {
   try {
     db = await open({ filename: dbPath, driver: sqlite3.Database });
-    app.listen(5000, () =>
-      console.log("Server running at http://localhost:5000/")
-    );
+    app.listen(PORT, () => {
+      console.log(`Server running at http://localhost:${PORT}/`);
+    });
   } catch (error) {
-    console.log(`DB Error: ${error.message}`);
+    console.error(`DB Error: ${error.message}`);
     process.exit(1);
   }
 };
+
 initializeDBAndServer();
+
 
 // Middleware for Authentication
 const authenticateToken = (req, res, next) => {
