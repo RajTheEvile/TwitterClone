@@ -14,7 +14,7 @@ const Followers = () => {
       .then((response) => setFollowers(response.data))
       .catch((error) => alert(error.response.data));
   }, [token]);
-  console.log(followers)
+  //console.log(followers)
   return (
     <div className="card p-3 mt-3 shadow-sm">
       <h2 className="text-success">Followers</h2>

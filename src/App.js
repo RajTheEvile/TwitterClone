@@ -5,11 +5,12 @@ import Register from "./pages/Register";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Search from "./pages/Search";
 import Profile from "./pages/Profile";
-import { ModeProvider } from "./Context/UserDataContext"; // Correct import
+import TweetPage from "./pages/TweetPage";
+import { ModeProvider } from "./Context/UserDataContext";
 
 function App() {
   return (
-    <ModeProvider> {/* ✅ Use ModeProvider instead of UserDataContext */}
+    <ModeProvider>
       <Routes>
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
@@ -17,6 +18,7 @@ function App() {
           <Route path="/search" element={<Search />} />
           <Route path="/" element={<Home />} />
           <Route path="/profile/:username" element={<Profile />} />
+          <Route path="/tweetpage/:tweetId" element={<TweetPage />} />
         </Route>
       </Routes>
     </ModeProvider>
@@ -24,4 +26,3 @@ function App() {
 }
 
 export default App;
-

@@ -5,10 +5,12 @@ import App from "./App";
 import './index.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 
+const basename = process.env.NODE_ENV === 'production' ? '/TwitterClone' : '/';
+console.log(basename);
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
-  <BrowserRouter>
+  <BrowserRouter basename={basename}>
     <App />
   </BrowserRouter>
 );

@@ -100,7 +100,7 @@ const Profile = () => {
                 </li>
               </ul>
               <div className="tweets p-3">
-                <TweetList tweets={user.tweets} />
+                <TweetList tweets={user.tweets} username={user.username} />
               </div>
             </div>
           ) : (

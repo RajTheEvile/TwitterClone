@@ -14,7 +14,7 @@ function Navbar() {
   };
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-primary px-3">
+    <nav className="navbar navbar-expand-lg navbar-dark bg-primary px-3 h-100">
       <div className="container-fluid">
         <Link className="navbar-brand fw-bold" to="/">Twitter Clone</Link>
         <button className="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">

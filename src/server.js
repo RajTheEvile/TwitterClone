@@ -33,6 +33,7 @@ initializeDBAndServer();
 
 // Middleware for Authentication
 const authenticateToken = (req, res, next) => {
+  //console.log('hi I am authenticate')
   const authHeader = req.headers["authorization"];
 
   if (!authHeader) return res.status(401).send("Invalid JWT Token");
@@ -82,10 +83,13 @@ app.post("/login/", async (req, res) => {
 
 // API 3: User's Tweet Feed
 app.get("/user/tweets/feed/", authenticateToken, async (req, res) => {
+  
   const { user_id } = req.user;
   const tweets = await db.all(
     `
-    SELECT user.username, tweet.tweet, tweet.date_time as dateTime ,tweet.tweet_id as tweetId
+    SELECT user.username, tweet.tweet, tweet.date_time as dateTime ,tweet.tweet_id as tweetId,
+    (SELECT COUNT(*) FROM like WHERE tweet_id = tweet.tweet_id) AS likes, 
+    (SELECT COUNT(*) FROM reply WHERE tweet_id = tweet.tweet_id) AS replies
     FROM tweet 
     JOIN follower ON tweet.user_id = follower.following_user_id
     JOIN user ON tweet.user_id = user.user_id
@@ -181,23 +185,7 @@ app.get("/tweets/:tweetId/likes/", authenticateToken, async (req, res) => {
   res.json({ likes: likedUsers.map((u) => u.username) });
 });
 
-// API 8: Get Replies for a Tweet
-app.get("/tweets/:tweetId/replies/", authenticateToken, async (req, res) => {
-  const { user_id } = req.user;
-  const { tweetId } = req.params;
 
-  const replies = await db.all(
-    `
-    SELECT user.name, reply.reply FROM reply 
-    JOIN user ON reply.user_id = user.user_id
-    WHERE reply.tweet_id = ?
-  `,
-    [tweetId]
-  );
-
-  if (replies.length === 0) return res.status(401).send("Invalid Request");
-  res.json({ replies });
-});
 
 // API 9: Get User's Tweets
 app.get("/user/tweets/", authenticateToken, async (req, res) => {
@@ -207,8 +195,11 @@ app.get("/user/tweets/", authenticateToken, async (req, res) => {
     SELECT tweet, 
       (SELECT COUNT(*) FROM like WHERE tweet_id = tweet.tweet_id) AS likes, 
       (SELECT COUNT(*) FROM reply WHERE tweet_id = tweet.tweet_id) AS replies, 
+      tweet_id as tweetId,
+
       date_time as dateTime
     FROM tweet WHERE user_id = ?
+    ORDER BY tweet.date_time DESC;
   `,
     [user_id]
   );
@@ -297,16 +288,16 @@ app.get("/profile/:username", authenticateToken, async (req, res) => {
       [loggedInUser, userWithoutFollowStatus.user_id]
     );
 
-    // Fetch user's tweets (Ensure multiple tweets can be fetched)
-    const tweets = await db.all(`SELECT * FROM Tweet WHERE user_id = ?`, [userWithoutFollowStatus.user_id]);
-
+    // Fetch user's tweets (Ensure multiple tweets can be fet ched)
+    const tweets = await db.all(`SELECT *,tweet_id as tweetId FROM Tweet WHERE user_id = ?`, [userWithoutFollowStatus.user_id]);
+    //console.log(tweets)
     // Construct the final response
     const user = {
       ...userWithoutFollowStatus,
       followingStatus: !!followingStatus, // Convert to boolean
       tweets, // Include fetched tweets
     };
-    console.log(user);
+    //console.log(user);
     res.json(user);
   } catch (error) {
     console.error("Error fetching user:", error);
@@ -404,6 +395,87 @@ app.post("/unfollow/:username", authenticateToken, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
+
+
+//tweetpage url
+app.get("/Tweetpage/:tweetId", authenticateToken, async (req, res) => {
+  const { tweetId } = req.params;
+
+  try {
+    // Main tweet info
+    const tweet = await db.get(`
+      SELECT tweet, 
+        (SELECT username FROM user WHERE user_id = tweet.user_id) AS username,
+        (SELECT COUNT(*) FROM like WHERE tweet_id = tweet.tweet_id) AS likes, 
+        (SELECT COUNT(*) FROM reply WHERE tweet_id = tweet.tweet_id) AS replies,
+        tweet_id AS tweetId,
+        date_time AS dateTime
+      FROM tweet 
+      WHERE tweet_id = ?;
+    `, [tweetId]);
+
+    // Replies (which are also tweets)
+    const replies = await db.all(`
+      SELECT 
+        tweet.tweet_id AS tweetId,
+        tweet.tweet,
+        tweet.date_time AS dateTime,
+        user.username,
+        (SELECT COUNT(*) FROM like WHERE tweet_id = tweet.tweet_id) AS likes,
+        (SELECT COUNT(*) FROM reply WHERE tweet_id = tweet.tweet_id) AS replies
+      FROM tweet
+      JOIN reply ON tweet.tweet_id = reply.reply_id
+      JOIN user ON tweet.user_id = user.user_id
+      WHERE reply.tweet_id = ?
+      ORDER BY tweet.date_time DESC;
+    `, [tweetId]);
+
+    res.json({ tweet, replies });
+  } catch (error) {
+    console.error("❌ Error fetching tweet page:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
+
+//tweet reply post 
+app.post("/reply/:tweetId", authenticateToken, async (req, res) => {
+  const { tweetId } = req.params;
+  const { reply } = req.body;
+  const { user_id } = req.user;
+
+  if (!reply || reply.trim() === "") {
+    return res.status(400).json({ error: "Reply cannot be empty" });
+  }
+
+  const date_time = new Date().toISOString();
+
+  try {
+    // 1. Insert reply as a tweet
+    const result = await db.run(
+      `INSERT INTO tweet (tweet, user_id, date_time) VALUES (?, ?, ?)`,
+      [reply, user_id, date_time]
+    );
+
+    const replyTweetId = result.lastID;
+
+    // 2. Link the reply to the original tweet
+    await db.run(
+      `INSERT INTO reply (reply_id, tweet_id, date_time) VALUES (?, ?, ?)`,
+      [replyTweetId, tweetId, date_time]
+    );
+
+    res.status(201).json({ message: "Reply posted successfully" });
+  } catch (error) {
+    console.error("❌ Error inserting reply tweet:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+
 
 
 

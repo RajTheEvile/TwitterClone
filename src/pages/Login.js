@@ -39,32 +39,39 @@ function Login() {
   };
 
   return (
-    <div className="container mt-5">
-      <h2>Login</h2>
-      {error && <p className="text-danger">{error}</p>}
-      <form onSubmit={handleLogin}>
-        <input
-          type="text"
-          className="form-control mb-2"
-          placeholder="Username"
-          required
-          value={credentials.username}
-          onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
-        />
-        <input
-          type="password"
-          className="form-control mb-2"
-          placeholder="Password"
-          required
-          value={credentials.password}
-          onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-        />
-        <button type="submit" className="btn btn-primary w-100" disabled={loading}>
-          {loading ? "Logging in..." : "Login"}
-        </button>
-        <Link className="btn btn-light mx-2" to="/register">Register</Link>
-      </form>
+    <div className="d-flex justify-content-center align-items-center vh-100">
+      <div className="card p-4 shadow-lg w-25">
+        <div className="container mt-5">
+              <h2 className="text-center pb-2 ">Login</h2>
+              {error && <p className="text-danger">{error}</p>}
+              <form onSubmit={handleLogin} className="text-center">
+                <input
+                  type="text"
+                  className="form-control mb-2"
+                  placeholder="Username"
+                  required
+                  value={credentials.username}
+                  onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
+                />
+                <input
+                  type="password"
+                  className="form-control mb-4"
+                  placeholder="Password"
+                  required
+                  value={credentials.password}
+                  onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
+                />
+                <button type="submit" className="btn btn-primary w-100 mb-3" disabled={loading}>
+                  {loading ? "Logging in..." : "Login"}
+                </button>
+                <Link className="btn btn-outline-secondary w-100" to="/register">Register</Link>
+              </form>
+            </div>
+      </div>
+
+      
     </div>
+    
   );
 }
 

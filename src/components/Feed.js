@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import Cookies from "js-cookie";
 
+
+import TweetList from "./TweetList";
+
 const Feed = () => {
   const [tweets, setTweets] = useState([]);
   const token = Cookies.get("token");
@@ -12,18 +15,13 @@ const Feed = () => {
     })
       .then((response) => setTweets(response.data))
       .catch((error) => alert(error.response.data));
-  }, []);
+  }, [token]);
 
+  //console.log(tweets)
   return (
     <div className="container mt-3">
       <h2 className="text-info">Tweet Feed</h2>
-      {tweets.map((tweet, index) => (
-        <div key={index} className="card shadow-sm p-3 mb-3">
-          <h4 className="text-primary">@{tweet.username}</h4>
-          <p className="mb-1">{tweet.tweet}</p>
-          <small className="text-muted">{tweet.dateTime}</small>
-        </div>
-      ))}
+      <TweetList tweets={tweets} />
     </div>
   );
 };
